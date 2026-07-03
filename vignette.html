@@ -3469,15 +3469,15 @@ window.Quarto = {
     <h2 id="toc-title">Table of contents</h2>
    
   <ul>
-  <li><a href="#preamble" id="toc-preamble" class="nav-link active" data-scroll-target="#preamble">Preamble</a></li>
-  <li><a href="#initial-setup" id="toc-initial-setup" class="nav-link" data-scroll-target="#initial-setup">Initial setup</a></li>
-  <li><a href="#data-simulation" id="toc-data-simulation" class="nav-link" data-scroll-target="#data-simulation">Data simulation</a></li>
-  <li><a href="#estimating-consumer-trophic-position" id="toc-estimating-consumer-trophic-position" class="nav-link" data-scroll-target="#estimating-consumer-trophic-position">Estimating consumer trophic position</a></li>
-  <li><a href="#isotopic-rescaling-of-consumers" id="toc-isotopic-rescaling-of-consumers" class="nav-link" data-scroll-target="#isotopic-rescaling-of-consumers">Isotopic rescaling of consumers</a></li>
-  <li><a href="#mixing-model-validation" id="toc-mixing-model-validation" class="nav-link" data-scroll-target="#mixing-model-validation">Mixing model validation</a></li>
-  <li><a href="#estimating-basal-source-proportions" id="toc-estimating-basal-source-proportions" class="nav-link" data-scroll-target="#estimating-basal-source-proportions">Estimating basal source proportions</a></li>
-  <li><a href="#references" id="toc-references" class="nav-link" data-scroll-target="#references">References</a></li>
-  <li><a href="#sec-sessioninfo" id="toc-sec-sessioninfo" class="nav-link" data-scroll-target="#sec-sessioninfo">Computational environment</a></li>
+  <li><a href="#preamble" id="toc-preamble" class="nav-link active" data-scroll-target="#preamble"><span class="header-section-number">1</span> Preamble</a></li>
+  <li><a href="#initial-setup" id="toc-initial-setup" class="nav-link" data-scroll-target="#initial-setup"><span class="header-section-number">2</span> Initial setup</a></li>
+  <li><a href="#data-simulation" id="toc-data-simulation" class="nav-link" data-scroll-target="#data-simulation"><span class="header-section-number">3</span> Data simulation</a></li>
+  <li><a href="#estimating-consumer-trophic-position" id="toc-estimating-consumer-trophic-position" class="nav-link" data-scroll-target="#estimating-consumer-trophic-position"><span class="header-section-number">4</span> Estimating consumer trophic position</a></li>
+  <li><a href="#isotopic-rescaling-of-consumers" id="toc-isotopic-rescaling-of-consumers" class="nav-link" data-scroll-target="#isotopic-rescaling-of-consumers"><span class="header-section-number">5</span> Isotopic rescaling of consumers</a></li>
+  <li><a href="#mixing-model-validation" id="toc-mixing-model-validation" class="nav-link" data-scroll-target="#mixing-model-validation"><span class="header-section-number">6</span> Mixing model validation</a></li>
+  <li><a href="#estimating-basal-source-proportions" id="toc-estimating-basal-source-proportions" class="nav-link" data-scroll-target="#estimating-basal-source-proportions"><span class="header-section-number">7</span> Estimating basal source proportions</a></li>
+  <li><a href="#references" id="toc-references" class="nav-link" data-scroll-target="#references"><span class="header-section-number">8</span> References</a></li>
+  <li><a href="#sec-sessioninfo" id="toc-sec-sessioninfo" class="nav-link" data-scroll-target="#sec-sessioninfo"><span class="header-section-number">9</span> Computational environment</a></li>
   </ul>
 <div class="quarto-alternate-formats"><h2>Other Formats</h2><ul><li><a href="vignette.pdf"><i class="bi bi-file-pdf"></i>PDF</a></li></ul></div></nav>
 </div>
@@ -3515,12 +3515,12 @@ window.Quarto = {
 </header>
 
 
-<section id="preamble" class="level1">
-<h1>Preamble</h1>
+<section id="preamble" class="level1" data-number="1">
+<h1 data-number="1"><span class="header-section-number">1</span> Preamble</h1>
 <p>This vignette illustrates step-by-step how to estimate the contribution of basal sources to the diet of consumers at multiple trophic positions using bulk stable isotope data in R. To do this, we simulate carbon and nitrogen stable isotope data for a food web with three sources, two isotopic baselines (i.e. primary consumers), and 20 consumer species from five different families.</p>
 </section>
-<section id="initial-setup" class="level1">
-<h1>Initial setup</h1>
+<section id="initial-setup" class="level1" data-number="2">
+<h1 data-number="2"><span class="header-section-number">2</span> Initial setup</h1>
 <p>First, to make the simulated data and results reproducible, we need to select a seed.</p>
 <div class="cell">
 <details open class="code-fold">
@@ -3581,8 +3581,8 @@ Note
 </div>
 </div>
 </section>
-<section id="data-simulation" class="level1">
-<h1>Data simulation</h1>
+<section id="data-simulation" class="level1" data-number="3">
+<h1 data-number="3"><span class="header-section-number">3</span> Data simulation</h1>
 <p>We simulate the data using the custom R function <a href="https://github.com/mattiaghilardi/SIMMmultitroph_vignette/blob/main/R/simulate_food_web.R"><code>simulate_food_web()</code></a>, which allows us to simulate isotopic signatures for a food web, including basal sources (i.e. primary producers), up to two isotopic baselines (i.e. primary consumers), and higher-level consumers, organised into species and families. The function has several arguments that give the user flexibility in determining the simulated food web. For example, you can specify the number of basal sources, baselines, and consumer species and families to simulate, as well as the sample size for each component and the trophic discrimination factors (TDFs) to use, among other things. The full list of arguments is:</p>
 <ul>
 <li><code>n_sources</code>: Number of sources to simulate. Default to 3</li>
@@ -3777,8 +3777,8 @@ Removed 1 row containing missing values or values outside the scale range
 </div>
 <p>Since we simulated the data, there is no need to perform any preliminary data preparation steps and we can move directly to estimating the trophic position of consumers.</p>
 </section>
-<section id="estimating-consumer-trophic-position" class="level1">
-<h1>Estimating consumer trophic position</h1>
+<section id="estimating-consumer-trophic-position" class="level1" data-number="4">
+<h1 data-number="4"><span class="header-section-number">4</span> Estimating consumer trophic position</h1>
 <p>To estimate consumer trophic position we fit a two-baseline model to each species using the R package <a href="https://github.com/clquezada/tRophicPosition/tree/master">tRophicPosition</a> <span class="citation" data-cites="quezada-romegialli_trophicposition_2018">(<a href="#ref-quezada-romegialli_trophicposition_2018" role="doc-biblioref">Quezada-Romegialli et al., 2018</a>)</span>. To do this, we first need to extract the isotope data for each consumer species with the <code>extractIsotopeData()</code> function.</p>
 <div class="cell">
 <details open class="code-fold">
@@ -4365,8 +4365,8 @@ Note
 </div>
 <p>We see that the error between the estimated and the true trophic postion (observed error) is in line with the expected error in trophic position based on the source and baseline mean isotopic signatures, source relative contributions to consumers and the TDFs used (<em>r<sub>Pearson</sub></em> = 0.65). For a few species the error is further from the expected one (i.e. difference greater than 0.1) due to their very small sample size (n = 3 for species 5, n = 1 for species 9, n = 2 for species 13, n = 3 for species 16), which leads to a high uncertainty in the estimation of trophic position.</p>
 </section>
-<section id="isotopic-rescaling-of-consumers" class="level1">
-<h1>Isotopic rescaling of consumers</h1>
+<section id="isotopic-rescaling-of-consumers" class="level1" data-number="5">
+<h1 data-number="5"><span class="header-section-number">5</span> Isotopic rescaling of consumers</h1>
 <p>After estimating consumer trophic position, we can rescale consumer isotopic signatures to the food web base (i.e. TP = 1) by subtracting <code>TP - 1</code> times the carbon and nitrogen TDFs. It would be preferable to propagate the uncertainty in TDFs and in the estimated consumer trophic positions into the rescaled isotopic signatures to obtain a more realistic uncertainty in basal source proportions. However, it is unfeasible because the inclusion of the measurement error in consumer isotopic signatures is not supported by existing Bayesian stable isotope mixing models. Therefore, we only use the mean TDFs and the estimated mode of trophic position.</p>
 <div class="cell">
 <details open class="code-fold">
@@ -4387,8 +4387,8 @@ Note
 </details>
 </div>
 </section>
-<section id="mixing-model-validation" class="level1">
-<h1>Mixing model validation</h1>
+<section id="mixing-model-validation" class="level1" data-number="6">
+<h1 data-number="6"><span class="header-section-number">6</span> Mixing model validation</h1>
 <p>Once consumer isotopic signatures are rescaled, we need to plot them in isotopic space to verify that they fall within the mixing polygon defined by the basal sources. We can do this using the function <code>plot_data()</code> from the R package <a href="http://brianstock.github.io/MixSIAR/">MixSIAR</a> <span class="citation" data-cites="stock_analyzing_2018">(<a href="#ref-stock_analyzing_2018" role="doc-biblioref">Stock et al., 2018</a>)</span>. However, this function, and all other MixSIAR functions, requires data in a specific format. The package provides special functions for this purpose, which load source, TDF, and consumer data from CSV files. Therefore, we save the data in the format required by MixSIAR in temporary CSV files. Importantly, we set TDFs to zero because we have already accounted for the total trophic discrimination between the base of the food web and the consumers during the rescaling process.</p>
 <div class="cell">
 <details open class="code-fold">
@@ -4507,8 +4507,8 @@ Note
 </div>
 <p>Given our well-resolved polygon, we should obtain relatively accurate results from the stable isotope mixing model.</p>
 </section>
-<section id="estimating-basal-source-proportions" class="level1">
-<h1>Estimating basal source proportions</h1>
+<section id="estimating-basal-source-proportions" class="level1" data-number="7">
+<h1 data-number="7"><span class="header-section-number">7</span> Estimating basal source proportions</h1>
 <p>To estimate basal source proportions for each consumer species, we fit a Bayesian hierarchical stable isotope mixing model using MixSIAR. First, we use the function <code>write_JAGS_model()</code> to write a JAGS model to a “txt” file as required by MixSIAR, specifying a process only error structure because we have a hierarchical structure and at least one consumer species with a single observation.</p>
 <div class="cell">
 <details open class="code-fold">
@@ -5793,8 +5793,8 @@ Geweke      25      15      15</code></pre>
 </div>
 <p>We can see that the model did a relatively good job of recovering source proportions at the family and global levels, as well as standard deviations.</p>
 </section>
-<section id="references" class="level1">
-<h1>References</h1>
+<section id="references" class="level1" data-number="8">
+<h1 data-number="8"><span class="header-section-number">8</span> References</h1>
 <div id="refs" class="references csl-bib-body hanging-indent" data-entry-spacing="0" data-line-spacing="2" role="list">
 <div id="ref-brett_resource_2014" class="csl-entry" role="listitem">
 Brett, M. T. (2014). Resource polygon geometry predicts bayesian stable isotope mixing model bias. <em>Marine Ecology Progress Series</em>, <em>514</em>, 1–12. <a href="https://doi.org/10.3354/meps11017">https://doi.org/10.3354/meps11017</a>
@@ -5810,8 +5810,8 @@ Stock, B. C., Jackson, A. L., Ward, E. J., Parnell, A. C., Phillips, D. L., &amp
 </div>
 </div>
 </section>
-<section id="sec-sessioninfo" class="level1">
-<h1>Computational environment</h1>
+<section id="sec-sessioninfo" class="level1" data-number="9">
+<h1 data-number="9"><span class="header-section-number">9</span> Computational environment</h1>
 <div class="cell">
 <div class="cell-output cell-output-stdout">
 <pre><code>R version 4.4.2 (2024-10-31)
