@@ -1,0 +1,871 @@
+---
+title: "A guide to estimate consumer reliance on basal food sources using bulk stable isotopes"
+subtitle: "An example with a simulated food web"
+author: "Mattia Ghilardi"
+date: last-modified
+date-format: "D MMMM YYYY"
+format: 
+  html: 
+    toc: true
+    code-fold: show
+    code-overflow: wrap
+    embed-resources: true
+  pdf:
+    documentclass: article
+    toc: true
+    number-sections: true
+    fig-pos: 'H'
+    cite-method: citeproc
+    geometry: margin=1in
+    include-in-header:
+      text: |
+        \setlength{\defaultaddspace}{0pt}
+bibliography: references.bib
+csl: methods-in-ecology-and-evolution.csl
+editor: source
+---
+
+```{r setup, include=FALSE}
+if (knitr::is_latex_output())
+  knitr::opts_chunk$set(dev = "cairo_pdf")
+```
+
+# Preamble
+
+This vignette illustrates step-by-step how to estimate the contribution of basal sources to the diet of consumers at multiple trophic positions using bulk stable isotope data in R. To do this, we simulate carbon and nitrogen stable isotope data for a food web with three sources, two isotopic baselines (i.e. primary consumers), and 20 consumer species from five different families.
+
+# Initial setup
+
+First, to make the simulated data and results reproducible, we need to select a seed.
+
+```{r}
+my_seed <- 9
+```
+
+Then, we load some required R packages and custom functions.
+
+```{r}
+#| message: false
+
+# Load packages
+library(readr) # for reading and writing files
+library(tibble) # for using tibbles
+library(dplyr) # for data manipulation
+library(tidyr) # for tidying data
+library(forcats) # for reordering factors
+library(ggplot2) # for plotting data
+library(tRophicPosition) # for estimating trophic position
+library(MixSIAR) # for fitting Bayesian stable isotope mixing models
+library(patchwork) # for combining ggplots
+library(ggtext) # for Markdown and HTML rendering for ggplot2
+```
+
+:::  {.callout-note}
+We will be using a few MixSIAR functions that are available in the development version, but not in the latest version published on CRAN (3.1.12), which has not been updated since 2020. To use these functions, install the development version of MixSIAR from [GitHub](https://github.com/brianstock/MixSIAR). For all other packages, see @sec-sessioninfo for the version used.
+::: 
+
+```{r}
+# Load custom functions available as appendices to the manuscript, 
+# placed here in a subfolder called "R"
+source("R/simulate_food_web.R") # Appendix S3
+source("R/estimate_tp_error.R") # Appendix S8
+```
+
+:::  {.callout-note}
+To use the custom function `simulate_food_web()`, some additional packages must be installed, but they don't need to be loaded. These include: "rlang", "purrr", "compositions", and "EnvStats".
+::: 
+
+# Data simulation
+
+We simulate the data using the custom R function [`simulate_food_web()`](https://github.com/mattiaghilardi/SIMMmultitroph_vignette/blob/main/R/simulate_food_web.R), which allows us to simulate isotopic signatures for a food web, including basal sources (i.e. primary producers), up to two isotopic baselines (i.e. primary consumers), and higher-level consumers, organised into species and families. The function has several arguments that give the user flexibility in determining the simulated food web. For example, you can specify the number of basal sources, baselines, and consumer species and families to simulate, as well as the sample size for each component and the trophic discrimination factors (TDFs) to use, among other things. The full list of arguments is:
+
+- `n_sources`: Number of sources to simulate. Default to 3
+- `source_C_range`: The range in source $\delta^{13}\mathrm{C}$. A numeric vector of length 2 (minimum and maximum). Ignored if `source_C_mean` is provided
+- `source_N_range`: The range in source $\delta^{15}\mathrm{N}$. A numeric vector of length 2 (minimum and maximum). Ignored if `source_N_mean` is provided
+- `source_C_mean`: Numeric vector of length `n_sources` with the mean $\delta^{13}\mathrm{C}$ for each source. If NULL (default), mean $\delta^{13}\mathrm{C}$ values are sampled from equal (n_sources * 2) intervals along the given `source_C_range`
+- `source_N_mean`: Numeric vector of length `n_sources` with the mean $\delta^{15}\mathrm{N}$ for each source. If NULL (default), mean $\delta^{15}\mathrm{N}$ values are sampled from equal (n_sources * 2) intervals along the given `source_N_range`
+- `source_C_sd`: Numeric vector of length `n_sources` with the $\delta^{13}\mathrm{C}$ standard deviation for each source
+- `source_N_sd`: Numeric vector of length `n_sources` with the $\delta^{15}\mathrm{N}$ standard deviation for each source
+- `n_obs_sources`: Numeric vector of length `n_sources` with the number of observations for each source. Can be a single value if all source have the same number of observations. Default to 10
+- `n_baselines`: Number of baselines (i.e. primary consumers, TP = 2) to simulate. Must be 1 (default) or 2
+- `n_obs_baselines`: Numeric vector of length `n_baselines` with number of observations for each baseline. Can be a single value if all baselines have the same number of observations. Default to 10
+- `n_families`: Number of consumer families to simulate. Default to 3
+- `n_species`: Number of consumer species to simulate. Default to 10. These are randomly split among the families
+- `n_obs_consumers`: Numeric vector of length `n_species` with number of observations for each consumer species. Can be a single value if all consumers have the same number of observations. Default to 10
+- `sd_families`: Variation in diet across families. Default to 1.5
+- `sd_species`: Variation in diet across species. Default to 0.5
+- `TP_sd`: Standard deviation of trophic position for baselines and consumer species. Default to 0.05
+- `n_TDF_C`: Number of observations for carbon's trophic discrimination factor
+- `mean_TDF_C`: Mean for carbon's trophic discrimination factor
+- `sd_TDF_C`: Standard deviation for carbon's trophic discrimination factor
+- `n_TDF_N`: Number of observations for nitrogen's trophic discrimination factor
+- `mean_TDF_N`: Mean for nitrogen's trophic discrimination factor
+- `sd_TDF_N`: Standard deviation for nitrogen's trophic discrimination factor
+- `C_baselines,C_consumers`: Total consumption of baselines and consumers (i.e. total number of source items eaten in the tissue turnover period). Default to 20
+- `seed`: The seed passed to `base::set.seed()` to make simulations reproducible. If `NA` (the default), `set.seed` will not be called
+
+We provide the function with a realistic range of $\delta^{13}\mathrm{C}$ and $\delta^{15}\mathrm{N}$ for basal sources based on those in the Mo'orea case study and randomly sample the source standard deviations from a uniform distribution, with a larger range for carbon than for nitrogen, as often observed. Additionally, we randomly sample the number of observations for each basal source, baseline and consumer species. We allow sample sizes of basal sources and baselines to range between 3 and 10, while for consumers we allow sample sizes as low as 1 to test if source contributions can be accurately recovered for sparsely sampled species.
+
+We also need to set the total consumption (*C*) of baselines and consumers, which represents the number of times that they sample basal source distributions. Thus, *C* is inversely proportional to the resulting consumer isotopic variability. We set *C* to 10 for the baselines to reflect greater variability in lower trophic positions, and 40 for consumers, which results in reasonable standard deviations. To see how *C* influences consumer variability, rerun the following chunk of code by increasing or decreasing *C* (for instance set `C_consumers = 5` or `C_consumers = 100`) and visualise the simulated food webs. Consumer's isotopic signatures simulated with *C* = 100 will have much smaller standard deviations than those simulated with *C* = 5.
+
+Finally, we use default isotope-specific TDFs which are generalist, non-tissue-specific TDFs taken from @post_using_2002.
+
+```{r}
+#| message: false
+
+# Set seed
+set.seed(my_seed)
+
+# Sample source SDs
+source_C_sd <- runif(3, 0.5, 2)
+source_N_sd <- runif(3, 0.5, 1)
+
+# Sample number of observations
+n_obs_sources <- sample(3:10, 3, replace = TRUE)
+n_obs_baselines <- sample(3:10, 2, replace = TRUE)
+n_obs_consumers <- sample(1:10, 20, replace = TRUE)
+
+# Simulate food web
+sim_data <- simulate_food_web(n_sources = 3,
+                              source_C_range = c(-20, -5), 
+                              source_N_range = c(0, 5),
+                              source_C_sd = source_C_sd, 
+                              source_N_sd = source_N_sd,
+                              n_baselines = 2,
+                              n_families = 5,
+                              n_species = 20,
+                              n_obs_sources = n_obs_sources,
+                              n_obs_baselines = n_obs_baselines,
+                              n_obs_consumers = n_obs_consumers,
+                              C_baselines = 10,
+                              C_consumers = 40,
+                              seed = my_seed)
+```
+
+The output of `simulate_food_web()` is a list with the following elements:
+
+- `isotopes`: data frame with isotope data for all observations
+- `sources_summary`: data frame with isotopic means and standard deviations for each source
+- `TP_families`: data frame with number of species, mean and
+standard deviation of trophic position for each family
+- `TP_species`: data frame with trophic position for each species
+- `alpha_baselines`: data frame with source proportions for each baseline
+- `alpha_global`: data frame with global source proportions
+- `alpha_families`: data frame with source proportions for each family
+- `alpha_species`: data frame with source proportions for each species
+- `TDF`: list of length two including the simulated values of
+carbon and nitrogen trophic discrimination factors
+- `TDF_summary`: data frame with mean and standard deviation of trophic
+discrimination factors for each source
+- `isospace_plot`: ggplot object displaying the food web in isotopic space
+
+```{r}
+str(sim_data, max.level = 1, give.attr = FALSE)
+```
+
+We can then visualise the simulated food web in isotopic space by looking at the generated `isospace_plot`.
+
+```{r}
+#| fig-height: 7
+
+# We adjust the legend position and size to fit in the document
+sim_data$isospace_plot +
+  guides(shape = guide_legend(ncol = 1),
+         color = guide_legend(ncol = 3)) +
+  theme(legend.position = "bottom", 
+        legend.title.position = "top",
+        legend.title = element_text(face = "bold", size = 8, hjust = 0.5),
+        legend.text = element_text(size = 7))
+```
+
+The warning indicates that one consumer species have only one observation and the error bars for this species (i.e. `r sim_data$alpha_species |> filter(n_obs_consumers == 1) |> pull(species) |> unique() |> as.character()`) cannot be displayed.
+
+Note that consumer families differ in $\delta^{15}\mathrm{N}$ as they have trophic positions ranging between `r min(sim_data$TP_families$TP_mean) |> round(2)` and `r max(sim_data$TP_families$TP_mean) |> round(2)`.
+
+<!-- Repeat code to not show `knitr::kable()` -->
+
+```{r}
+#| eval: false
+
+# Print family TP
+sim_data$TP_families |> 
+  mutate(across(where(is.double), ~ round(.x, 3)))
+```
+
+```{r}
+#| echo: false
+
+sim_data$TP_families |> 
+  mutate(across(where(is.double), ~ round(.x, 3))) |> 
+  knitr::kable() |> 
+  kableExtra::kable_styling(latex_options = "repeat_header",
+                            repeat_header_continued = TRUE)
+```
+
+Furthermore, related species (i.e. from the same family) are clustered together. This is because we used the default standard deviations for family and species, which are 1.5 and 0.5, respectively (see above). This simulates strong phylogenetic conservatism in consumers diet, where diet is more variable across than within families, which is a common feature in ecology. Increasing the species standard deviation, for example up to 1.5, results in a weaker phylogenetic conservatism and therefore greater variability in basal source use within each family, as can be observed by the greater dispersion of related species in the isotopic space below.
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+#| fig-height: 7
+
+# Simulate same food web but with "sd_species = 1.5"
+sim_data2 <- simulate_food_web(n_sources = 3,
+                               source_C_range = c(-20, -5), 
+                               source_N_range = c(0, 5),
+                               source_C_sd = source_C_sd, 
+                               source_N_sd = source_N_sd,
+                               n_baselines = 2,
+                               n_families = 5,
+                               n_species = 20,
+                               n_obs_sources = n_obs_sources,
+                               n_obs_baselines = n_obs_baselines,
+                               n_obs_consumers = n_obs_consumers,
+                               C_baselines = 10,
+                               C_consumers = 40,
+                               seed = my_seed,
+                               sd_species = 1.5)
+
+# Plot the two food webs side by side with species SD as title
+sim_data$isospace_plot + ggtitle("sd_species = 0.5") +
+  sim_data2$isospace_plot + ggtitle("sd_species = 1.5") + 
+  plot_layout(guides = "collect", axes = "collect") &
+  guides(shape = guide_legend(ncol = 1),
+         color = guide_legend(ncol = 3)) &
+  theme(plot.title = element_text(hjust = 0.5), 
+        legend.position = "bottom", 
+        legend.title.position = "top",
+        legend.title = element_text(face = "bold", size = 8, hjust = 0.5),
+        legend.text = element_text(size = 7))
+```
+
+Since we simulated the data, there is no need to perform any preliminary data preparation steps and we can move directly to estimating the trophic position of consumers.
+
+# Estimating consumer trophic position
+
+To estimate consumer trophic position we fit a two-baseline model to each species using the R package [tRophicPosition](https://github.com/clquezada/tRophicPosition/tree/master) [@quezada-romegialli_trophicposition_2018]. To do this, we first need to extract the isotope data for each consumer species with the `extractIsotopeData()` function.
+
+```{r}
+#| message: false
+#| output: false
+
+# Extract data for each consumer species
+si_data_list <- extractIsotopeData(sim_data$isotopes |> 
+                                     # remove sources
+                                     filter(type != "source"), 
+                                   b1 = "primary consumer 1", 
+                                   b2 = "primary consumer 2",
+                                   baselineColumn = "name", 
+                                   consumersColumn = "name",
+                                   groupsColumn = NULL,
+                                   d13C = "d13C", 
+                                   d15N = "d15N",
+                                   deltaC = sim_data$TDF$deltaC,
+                                   deltaN = sim_data$TDF$deltaN)
+```
+
+Then, we can estimate the trophic position using the `multiSpeciesTP()` function and the "twoBaselinesFull" model. We set `lambda` (i.e. the trophic position of baselines) to 2 because our isotopic baselines are primary consumers.
+
+:::  {.callout-note}
+The results of this step, and consequently subsequent ones, will be slightly different each time the code is run. To obtain reproducible results, modifications to the `tRophicPosition::TPmodel()` source code are required.
+::: 
+
+<!-- Do not rerun as results would be slightly different -->
+
+```{r}
+#| eval: false
+
+# Fit multispecies twoBaselinesFull model with default arguments
+estimated_TP <- multiSpeciesTP(siDataList = si_data_list,
+                               lambda = 2,
+                               model = "twoBaselinesFull")
+```
+
+```{r}
+#| include: false
+
+estimated_TP <- read_rds("TP_output/estimated_TP.rds")
+```
+
+<!-- Repeat code to not show `knitr::kable()` -->
+
+```{r}
+#| eval: false
+
+# Print estimated TP
+estimated_TP$df |> 
+  select(-c(model, group, combined)) |> 
+  mutate(across(where(is.double), ~ round(.x, 3)))
+```
+
+```{r}
+#| echo: false
+
+# Print estimated TP
+estimated_TP$df |> 
+  select(-c(model, group, combined)) |> 
+  mutate(across(where(is.double), ~ round(.x, 3))) |> 
+  knitr::kable() |> 
+  kableExtra::kable_styling(font_size = 8, 
+                            latex_options = "repeat_header",
+                            repeat_header_continued = TRUE)
+```
+
+The table shows summary statistics (median, mode, lower and upper bound of 95% CI) for the trophic position (first four columns) and the proportional contribution of baseline one (columns starting with "alpha") estimated for each species.
+
+We can compare the estimated and true (known) trophic position of each consumer species.
+
+```{r}
+#| fig-height: 6.5
+
+# Plot observed and estimated trophic positions
+estimated_TP$df |> 
+  # split consumer name into family and species to plot a panel per family
+  separate_wider_delim(consumer,
+                       delim = "_", 
+                       names = c("family", "species")) |> 
+  # add name for legend
+  mutate(TP_type = "Model estimate\n(mode and 95% CI)") |>  
+  ggplot(aes(x = mode, y = species, color = TP_type)) +
+  geom_pointrange(aes(xmin = lower, xmax = upper)) +
+  # add true TP
+  geom_point(data = sim_data$TP_species |> 
+               # add name for legend
+               mutate(TP_type = "Observed"),
+             aes(x = TP),
+             size = 3, 
+             alpha = 0.5) +
+  scale_color_manual(values = c("Black", "Red")) +
+  # split by family and reverse order
+  facet_grid(rows = vars(fct_rev(family)), 
+             scales = "free",
+             space = "free") + 
+  labs(x = "Trophic position",
+       y = "Consumer") +
+  theme_bw() +
+  theme(legend.title = element_blank(),
+        legend.position = "top")
+```
+
+The trophic position is relatively well estimated for all species. Species with low sample sizes have large uncertainties in estimated trophic position, although the point estimate (i.e. the mode) is close to the true value. The absolute error between the estimated mode and the true trophic position is:
+
+<!-- Repeat code to not show `knitr::kable()` -->
+
+```{r}
+#| eval: false
+
+estimated_TP$df |> 
+  separate_wider_delim(consumer, 
+                       delim = "_", 
+                       names = c("family", "species")) |> 
+  select(family, species, estimated_TP = mode) |> 
+  left_join(sim_data$TP_species |> 
+              rename(true_TP = TP)) |> 
+  mutate(absolute_error = abs(estimated_TP - true_TP),
+         across(where(is.double), ~ round(.x, 3)))
+```
+
+```{r}
+#| echo: false
+#| message: false
+
+estimated_TP$df |> 
+  separate_wider_delim(consumer, 
+                       delim = "_", 
+                       names = c("family", "species")) |> 
+  select(family, species, estimated_TP = mode) |> 
+  left_join(sim_data$TP_species |> 
+              rename(true_TP = TP)) |> 
+  mutate(absolute_error = abs(estimated_TP - true_TP),
+         across(where(is.double), ~ round(.x, 3))) |> 
+  knitr::kable()
+```
+
+Finally, we can compare the observed error with the expected error in trophic position for each species, obtained using the custom function [`estimate_tp_error()`](https://github.com/mattiaghilardi/SIMMmultitroph_vignette/blob/main/R/estimate_tp_error.R). This function has the following arguments:
+
+- `sources`: A data frame with mean isotopic values of sources. Must have a column named "d15N_mean" and, if using two baselines, a column named "d13C_mean".
+- `baselines`: A data frame with mean isotopic values of one or two baselines. Must have a column named "d15N_mean" and, if using two baselines, a column named "d13C_mean".
+- `TP_b`: A numeric value. Trophic position of baseline(s). Default to 2 (i.e., primary consumers).
+- `TDF_N`: A numeric value. The TDF for $\delta^{15}\mathrm{N}$.
+- `TDF_C`: A numeric value. The TDF for $\delta^{13}\mathrm{C}$. Default to NULL. Only necessary for two baselines.
+- `consumer_p`: A numeric vector summing to 1. The source relative contributions to the consumer.
+
+```{r}
+
+# Prepare data for `estimate_tp_error()`
+# Source means
+source_means <- sim_data$sources_summary
+
+# Baseline means
+baseline_means <- sim_data$isotopes |>
+  filter(type == "baseline") |> 
+  group_by(name) |> 
+  summarise(d13C_mean = mean(d13C),
+            d15N_mean = mean(d15N))
+
+# Source relative contributions to each species
+consumers_p <- sim_data$alpha_species |> 
+  split(~species) |> # split by species
+  purrr::map(~pull(.x, alpha)) # extract source contributions per species
+
+# Compute expected error in TP for each species
+expected_error <- purrr::map(
+  consumers_p,
+  ~ tibble(
+    estimated_error = estimate_tp_error(sources = source_means,
+                                        baselines = baseline_means,
+                                        TP_b = 2,
+                                        TDF_N = mean(sim_data$TDF$deltaN),
+                                        TDF_C = mean(sim_data$TDF$deltaC),
+                                        consumer_p = .x)
+    )
+  ) |> 
+  bind_rows(.id = "species")
+
+# Compute observed error in TP for each species (as above but not absolute value)
+observed_error <- estimated_TP$df |> 
+  separate_wider_delim(consumer, 
+                       delim = "_", 
+                       names = c("family", "species")) |> 
+  select(family, species, estimated_TP = mode) |> 
+  left_join(sim_data$TP_species |> 
+              rename(true_TP = TP),
+            by = c("family", "species")) |> 
+  mutate(error = estimated_TP - true_TP)
+
+# Plot relationship
+observed_error |> 
+  left_join(expected_error, by = "species") |> 
+  mutate(diff = abs(error - estimated_error)) |>
+  ggplot(aes(x = error, y = estimated_error)) + 
+  geom_point() +
+  geom_abline() + # add 1:1 line
+  geom_text(aes(label = ifelse(diff > 0.1, species, "")),
+            hjust = 1, vjust = 1.2) + # add label for few points
+  labs(x = "Observed error in TP",
+       y = "Expected error in TP") +
+  theme_bw() 
+```
+
+We see that the error between the estimated and the true trophic postion (observed error) is in line with the expected error in trophic position based on the source and baseline mean isotopic signatures, source relative contributions to consumers and the TDFs used (*r~Pearson~* = `r cor(observed_error$error, expected_error$estimated_error) |> round(2)`). For a few species the error is further from the expected one (i.e. difference greater than 0.1) due to their very small sample size (`r observed_error |> left_join(expected_error, by = "species") |> mutate(diff = abs(error - estimated_error)) |> left_join(sim_data$alpha_species |> select(family, species, n_obs_consumers) |> distinct()) |> filter(diff > 0.1) |> mutate(text = paste("n =", n_obs_consumers, "for", species)) |> pull(text) |> paste(collapse = ", ")`), which leads to a high uncertainty in the estimation of trophic position.
+
+# Isotopic rescaling of consumers
+
+After estimating consumer trophic position, we can rescale consumer isotopic signatures to the food web base (i.e. TP = 1) by subtracting `TP - 1` times the carbon and nitrogen TDFs. It would be preferable to propagate the uncertainty in TDFs and in the estimated consumer trophic positions into the rescaled isotopic signatures to obtain a more realistic uncertainty in basal source proportions. However, it is unfeasible because the inclusion of the measurement error in consumer isotopic signatures is not supported by existing Bayesian stable isotope mixing models. Therefore, we only use the mean TDFs and the estimated mode of trophic position.
+
+```{r}
+# Get mean TDF values for C and N
+mean_TDF_C <- mean(sim_data$TDF$deltaC)
+mean_TDF_N <- mean(sim_data$TDF$deltaN)
+
+# Rescale consumer’s isotopic signatures
+consumers_rescaled <- sim_data$isotopes |> 
+  filter(type == "higher consumer") |> 
+  left_join(estimated_TP$df |>
+              select(consumer, TP = mode), 
+            by = c("name" = "consumer")) |> 
+  mutate(d13C = d13C - mean_TDF_C * (TP - 1),
+         d15N = d15N - mean_TDF_N * (TP - 1)) |> 
+  select(family, species, d13C, d15N, TP)
+```
+
+# Mixing model validation
+
+Once consumer isotopic signatures are rescaled, we need to plot them in isotopic space to verify that they fall within the mixing polygon defined by the basal sources. We can do this using the function `plot_data()` from the R package [MixSIAR](http://brianstock.github.io/MixSIAR/) [@stock_analyzing_2018]. However, this function, and all other MixSIAR functions, requires data in a specific format. The package provides special functions for this purpose, which load source, TDF, and consumer data from CSV files. Therefore, we save the data in the format required by MixSIAR in temporary CSV files. Importantly, we set TDFs to zero because we have already accounted for the total trophic discrimination between the base of the food web and the consumers during the rescaling process.
+
+```{r}
+# Sources (raw data): first column source names, then isotopes
+sourcespath <- tempfile(pattern = "sim_sources", fileext = ".csv")
+write_csv(sim_data$isotopes |> 
+            filter(type == "source") |> 
+            select(source = name, d13C, d15N), 
+          file = sourcespath)
+# TDF: first column source names, then mean and sd of isotopes
+# We set TDFs to 0 because we have rescaled consumers to the food web base
+tdfpath <- tempfile(pattern = "sim_tdf", fileext = ".csv")
+write_csv(sim_data$TDF_summary |> 
+            mutate(across(where(is.double), ~ 0)),
+          file = tdfpath)
+# Mixtures: data frame including isotopes and covariates
+# We need family and species as covariates
+consumerspath <- tempfile(pattern = "sim_consumers", fileext = ".csv")
+write_csv(consumers_rescaled, 
+          file = consumerspath)
+```
+
+Then, we load the data with the special functions provided by MixSIAR. First, we load consumer data (i.e. mixtures) using the function `load_mix_data()`, because the resulting object is required to load source and TDF data. This function allows to define the covariates to be included in the model. MixSIAR is limited to one continuous covariate and two factors, that can be either fixed or random effects, and random effects can be nested. Since we have multiple observations per species, and species are grouped into families, we specify two random effects, family and species, with species nested within family.
+
+```{r}
+# Mixtures: nested random effect of species within family
+mix <- load_mix_data(consumerspath, 
+                     iso_names = c("d13C", "d15N"), 
+                     factors = c("family", "species"),
+                     fac_random = c(TRUE, TRUE),
+                     fac_nested = c(FALSE, TRUE),
+                     cont_effects = NULL)
+```
+
+By passing this object to the functions `load_source_data()` and `load_discr_data()`, we load the source and TDF data, respectively. Furthermore, we specify that source data are "raw" values.
+
+```{r}
+# Sources: raw data
+source <- load_source_data(sourcespath, 
+                           data_type = "raw", 
+                           mix = mix,
+                           conc_dep = FALSE)
+# TDF
+tdf <- load_discr_data(tdfpath,
+                       mix = mix)
+```
+
+We can now plot the rescaled consumer data in isotopic space with the function `plot_data()`.
+
+```{r}
+#| output: false
+#| message: false
+#| warning: false
+
+# Check isotopic space
+p <- plot_data(mix = mix, source = source, discr = tdf,
+               # avoid saving files
+               plot_save_pdf = FALSE, plot_save_png = FALSE,
+               return_obj = TRUE)
+
+# Modify point shapes and legend position
+p <- p +
+  # Replace shape scale because MixSIAR allows a maximum of 15
+  scale_shape_manual(values = c(1:18, 35, 36), 
+                     labels = mix$FAC[[2]]$labels) +
+  # Change legend position for clarity (default inside the plot)
+  theme(legend.position = "right",
+        legend.text = element_text(size = 8)) +
+  # Make two columns
+  guides(color = guide_legend(ncol = 1),
+         shape = guide_legend(ncol = 2))
+
+p
+```
+
+```{r}
+#| include: false
+
+# Fix axis labels 
+p <- p +
+  labs(x = "&delta;<sup>13</sup>C (&permil;)",
+       y = "&delta;<sup>15</sup>N (&permil;)") +
+  theme(axis.title.x = element_markdown(),
+        axis.title.y = element_markdown())
+```
+
+```{r}
+#| echo: false
+#| fig-height: 4.5
+
+p
+```
+
+After rescaling the isotopic data, all consumers fall within the mixing polygon of the sources. Furthermore, we can see that families 1, 4 and 5 are close to source 3, while families 2 and 3 are closer to source 1. No much distinction can be noted among related species as we used a small standard deviation of 0.5.
+
+Additionally, we can calculate the normalised surface area of the mixing polygon using the function `calc_area()` from MixSIAR.
+
+```{r}
+polygon_area <- calc_area(source = source, mix = mix, discr = tdf)
+polygon_area
+```
+
+This value indicates that we have a well-resolved polygon with less than 20% bias according to @brett_resource_2014. We can also use equations 3 and 4 from @brett_resource_2014 and values from Table 1 of the same paper to obtain the actual bias for consumers dominated by a single source.
+
+```{r}
+# Function to compute bias using eq 3 and 4 from Brett 2014
+# Values are from table 1 in Brett 2014 for 3 resources
+get_bias <- function(area) {
+  y <- 0.803 + ((0.334 - 0.803) / (1 + exp((log(area) - 1.247) / 0.832)))
+  
+  bias <- (1 - ((y - 1/3) / (0.8 - 1/3))) * 100
+  
+  return(bias)
+}
+
+get_bias(area = polygon_area)
+```
+
+Given our well-resolved polygon, we should obtain relatively accurate results from the stable isotope mixing model.
+
+# Estimating basal source proportions
+
+To estimate basal source proportions for each consumer species, we fit a Bayesian hierarchical stable isotope mixing model using MixSIAR. First, we use the function `write_JAGS_model()` to write a JAGS model to a "txt" file as required by MixSIAR, specifying a process only error structure because we have a hierarchical structure and at least one consumer species with a single observation.
+
+```{r}
+# Write model with process only error
+modelpath <- tempfile(pattern = "test_model", fileext = ".txt")
+write_JAGS_model(modelpath, 
+                 resid_err = FALSE, 
+                 process_err = TRUE, 
+                 mix = mix, 
+                 source = source)
+```
+
+Then, we fit the model using the function `run_model()`, with the default "uninformative"/generalist prior on global proportions (*Dirichlet*(1, 1, 1)), which can be shortened as `alpha.prior = 1`. Given the hierarchical structure, and thus many parameters to estimate, the model requires a large number of iterations to converge. We set `run = "long"`, which fits 3 chains, each with 300,000 iterations, a of 200,000-iteration burn-in and a thinning of 100, thus retaining 3,000 posterior draws (i.e., 1,000 x 3 chains).
+
+```{r}
+#| eval: false
+
+# Fit model with "uninformative" alpha prior
+mixsiar_fit <- run_model(run = "long",
+                         mix = mix,
+                         source = source,
+                         discr = tdf,
+                         model_filename = modelpath,
+                         alpha.prior = 1)
+```
+
+```{r}
+#| include: false
+# run test to have all packages in sessionInfo()
+mixsiar_fit <- run_model(run = "test",
+                         mix = mix,
+                         source = source,
+                         discr = tdf,
+                         model_filename = modelpath,
+                         alpha.prior = 1)
+# now replace with stored long run
+mixsiar_fit <- read_rds("MixSIAR_output/example_mixing_model_long.rds")
+```
+
+With this large number of iterations the model takes several minutes to run. Once finished, we can check if it has converged using the function `output_diagnostics()`. But first we set the options to save diagnostics and summary statistics to files and avoid saving plots.
+
+```{r}
+# Set output options
+# Save output files in separate folder
+output_dir <- "MixSIAR_output"
+if (!dir.exists(output_dir)) dir.create(output_dir)
+mixsiar_options <- list(
+  summary_save = TRUE,
+  summary_name = paste(output_dir, "summary_statistics", sep = "/"),
+  sup_post = TRUE,
+  plot_post_save_pdf = FALSE,
+  plot_post_name = paste(output_dir, "posterior_density", sep = "/"),
+  sup_pairs = TRUE,
+  plot_pairs_save_pdf = FALSE,
+  plot_pairs_name = paste(output_dir, "pairs_plot", sep = "/"),
+  sup_xy = TRUE,
+  plot_xy_save_pdf = FALSE,
+  plot_xy_name = paste(output_dir, "xy_plot", sep = "/"),
+  gelman = TRUE,
+  heidel = FALSE,
+  geweke = TRUE,
+  diag_save = TRUE,
+  diag_name = paste(output_dir, "diagnostics", sep = "/"),
+  indiv_effect = FALSE,       
+  plot_post_save_png = FALSE, 
+  plot_pairs_save_png = FALSE,
+  plot_xy_save_png = FALSE,
+  diag_save_ggmcmc = FALSE,
+  return_obj = TRUE
+  )
+
+# Check diagnostics
+model_diagnostics <- output_diagnostics(mixsiar_fit, 
+                                        mix = mix, 
+                                        source = source, 
+                                        output_options = mixsiar_options)
+```
+
+Diagnostics look good, indicating model convergence. Thus, we use the function `output_statistics()` to get a summary table with point estimates and credible intervals of each parameter.
+
+```{r}
+#| output: false
+
+# Get summary statistics
+model_stats <- output_stats(mixsiar_fit, 
+                            mix = mix, 
+                            source = source, 
+                            output_options = mixsiar_options) |>
+  as.data.frame() |>
+  rownames_to_column("parameter")
+
+model_stats
+```
+
+```{r}
+#| echo: false
+
+knitr::kable(model_stats) |> 
+  kableExtra::kable_styling(latex_options = "repeat_header",
+                            repeat_header_continued = TRUE)
+```
+
+Now we can compare model estimates with true values of source proportions. For each consumer species and source we plot the posterior median, 50% and 95% CIs (points and intervals) along with the true values (empty squares).
+
+```{r}
+#| fig-height: 7.5
+
+# Plot species-level estimates
+model_stats |> 
+  filter(startsWith(parameter, "p.species")) |> 
+  separate_wider_delim(parameter, 
+                       delim = ".", 
+                       names = c("p", "species", "source")) |>
+  left_join(sim_data$alpha_species, 
+            by = c("species", "source")) |> 
+  mutate(species = factor(species, levels = paste("species", 1:20))) |> 
+  ggplot(aes(y = species, color = source)) +
+  geom_linerange(aes(xmin = `2.5%`, xmax = `97.5%`),
+                 linewidth = 0.5,
+                 position = position_dodge(width = 0.7)) +
+  geom_pointrange(aes(x = `50%`, xmin = `25%`, xmax = `75%`),
+                  linewidth = 1,
+                  fatten = 2,
+                  position = position_dodge(width = 0.7)) +
+  geom_point(aes(x = alpha), 
+             position = position_dodge(width = 0.7), 
+             shape = 22, 
+             size = 4) +
+  scale_color_viridis_d() +
+  facet_grid(rows = vars(fct_rev(family)), 
+             scales = "free",
+             space = "free") +
+  labs(x = "Relative contribution",
+       y = "Consumer species") +
+  theme_bw() +
+  theme(legend.position = "top")
+```
+
+```{r}
+#| include: false
+
+p_error <- model_stats |> 
+    filter(startsWith(parameter, "p.species")) |> 
+    separate_wider_delim(parameter,
+                         delim = ".", 
+                         names = c("p", "species", "source")) |>
+    left_join(sim_data$alpha_species, 
+              by = c("species", "source")) |> 
+    mutate(error = abs(`50%` - alpha)) |> 
+  pull(error)
+```
+
+Overall, true source proportions were recovered relatively well, with nearly all values within the estimated 95% credible intervals, regardless of the number of observations. Furthermore, point estimates deviate less than `r (max(p_error) * 100) |> round(0)`% from the true proportions (mean = `r (mean(p_error) * 100) |> round(2)`%) as shown in the figure below.
+
+```{r}
+# Plot error in estimated source proportions
+model_stats |> 
+  filter(startsWith(parameter, "p.species")) |> 
+  separate_wider_delim(parameter,
+                       delim = ".", 
+                       names = c("p", "species", "source")) |>
+  left_join(sim_data$alpha_species, 
+            by = c("species", "source")) |> 
+  mutate(error = `50%` - alpha) |> 
+  ggplot(aes(x = source, 
+             y = error, 
+             color = source, 
+             fill = stage(source, 
+                          after_scale = alpha(fill, 0.2)))) +
+  geom_hline(yintercept = 0, linetype = "dashed") + 
+  geom_boxplot(outliers = FALSE, width = 0.2) +
+  geom_point(position = position_jitter(width = 0.2, seed = my_seed), 
+             shape = 21) + 
+  ylab("Error in estimated source proportion") + 
+  scale_color_viridis_d(aesthetics = c("color", "fill")) + 
+  theme_bw() + 
+  theme(legend.position = "none")
+```
+
+Finally, we can compare model estimates with true values of source proportions at the family and global levels and we can check whether the model was able to recover the simulated species and family standard deviations.
+
+```{r}
+#| message: false
+
+# Plot global estimates
+model_stats |> 
+  filter(startsWith(parameter, "p.global")) |> 
+  separate_wider_delim(parameter, 
+                       delim = ".", 
+                       names = c("p", "global", "source")) |>
+  left_join(sim_data$alpha_global |> 
+              pivot_longer(cols = everything(), 
+                           names_to = "source",
+                           values_to = "alpha")) |> 
+  ggplot(aes(y = source, color = source)) +
+  geom_linerange(aes(xmin = `2.5%`, xmax = `97.5%`),
+                 linewidth = 0.5,
+                 position = position_dodge(width = 0.7)) +
+  geom_pointrange(aes(x = `50%`, xmin = `25%`, xmax = `75%`),
+                  linewidth = 1,
+                  fatten = 2,
+                  position = position_dodge(width = 0.7)) +
+  geom_point(aes(x = alpha), shape = 22, size = 4) +
+  scale_color_viridis_d() +
+  labs(x = "Relative contribution",
+       y = "Global") +
+  theme_bw() +
+  theme(legend.position = "top")
+```
+
+```{r}
+#| message: false
+
+# Plot family-level estimates
+model_stats |> 
+  filter(startsWith(parameter, "p.family")) |> 
+  separate_wider_delim(parameter, 
+                       delim = ".",
+                       names = c("p", "family", "source")) |>
+  left_join(sim_data$alpha_families) |> 
+  ggplot(aes(y = family, color = source)) +
+  geom_linerange(aes(xmin = `2.5%`, xmax = `97.5%`),
+                 linewidth = 0.5,
+                 position = position_dodge(width = 0.7)) +
+  geom_pointrange(aes(x = `50%`, xmin = `25%`, xmax = `75%`),
+                  linewidth = 1,
+                  fatten = 2,
+                  position = position_dodge(width = 0.7)) +
+  geom_point(aes(x = alpha), 
+             position = position_dodge(width = 0.7), 
+             shape = 22, 
+             size = 4) +
+  scale_color_viridis_d() +
+  labs(x = "Relative contribution",
+       y = "Consumer family") +
+  theme_bw() +
+  theme(legend.position = "top")
+```
+
+```{r}
+# Plot group SDs
+model_stats |> 
+  filter(endsWith(parameter, "SD")) |> 
+  left_join(data.frame(parameter = c("species.SD", "family.SD"),
+                       true_SD = c(0.5, 1.5)),
+            by = "parameter") |> 
+  mutate(parameter = paste("<i>&sigma;</i><sub>", 
+                           gsub(".SD", "", parameter), 
+                           "</sub>")) |>
+  ggplot(aes(y = parameter)) +
+  geom_linerange(aes(xmin = `2.5%`, xmax = `97.5%`),
+                 linewidth = 0.5) +
+  geom_pointrange(aes(x = `50%`, xmin = `25%`, xmax = `75%`),
+                  linewidth = 1,
+                  fatten = 2) +
+  geom_point(aes(x = true_SD), shape = 22, size = 4) +
+  labs(x = "Relative contribution",
+       y = "Group SD") +
+  theme_bw() +
+  theme(axis.text.y = element_markdown())
+```
+
+We can see that the model did a relatively good job of recovering source proportions at the family and global levels, as well as standard deviations.
+
+# References
+
+::: {#refs}
+:::
+
+# Computational environment {#sec-sessioninfo}
+
+```{r}
+#| echo: false
+sessionInfo()
+```

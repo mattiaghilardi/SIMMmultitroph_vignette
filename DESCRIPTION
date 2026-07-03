@@ -1,0 +1,11 @@
+Package: SIMMmultitroph_vignette
+Title: Online material for Ghilardi et al. 2026
+Version: 1.0.0
+Authors@R: 
+    person("Mattia", "Ghilardi", , "mattia.ghilardi91@gmail.com", role = c("aut", "cre"),
+           comment = c(ORCID = "0000-0001-9592-7252"))
+Description: Vignette demonstrating the application of the workflow proposed by Ghilardi et al 2026 to estimate consumer reliance on basal food sources using bulk stable isotopes.
+License: MIT + file LICENSE
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.3.1
