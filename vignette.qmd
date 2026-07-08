@@ -607,7 +607,7 @@ write_JAGS_model(modelpath,
                  source = source)
 ```
 
-Then, we fit the model using the function `run_model()`, with the default "uninformative"/generalist prior on global proportions (*Dirichlet*(1, 1, 1)), which can be shortened as `alpha.prior = 1`. Given the hierarchical structure, and thus many parameters to estimate, the model requires a large number of iterations to converge. We set `run = "long"`, which fits 3 chains, each with 300,000 iterations, a of 200,000-iteration burn-in and a thinning of 100, thus retaining 3,000 posterior draws (i.e., 1,000 x 3 chains).
+Then, we fit the model using the function `run_model()`, with the default "uninformative"/generalist prior on global proportions (*Dirichlet*(1, 1, 1)), which can be shortened as `alpha.prior = 1`. Given the hierarchical structure, and thus many parameters to estimate, the model requires a large number of iterations to converge. We set `run = "long"`, which fits 3 chains, each with 300,000 iterations, a 200,000-iteration burn-in and a thinning of 100, thus retaining 3,000 posterior draws (i.e., 1,000 x 3 chains).
 
 ```{r}
 #| eval: false

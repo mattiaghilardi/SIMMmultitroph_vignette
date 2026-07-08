@@ -7,7 +7,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
 <meta name="author" content="Mattia Ghilardi">
-<meta name="dcterms.date" content="2026-07-03">
+<meta name="dcterms.date" content="2026-07-08">
 
 <title>A guide to estimate consumer reliance on basal food sources using bulk stable isotopes</title>
 <style>
@@ -3503,7 +3503,7 @@ window.Quarto = {
     <div>
     <div class="quarto-title-meta-heading">Published</div>
     <div class="quarto-title-meta-contents">
-      <p class="date">3 July 2026</p>
+      <p class="date">8 July 2026</p>
     </div>
   </div>
   
@@ -4522,7 +4522,7 @@ Note
 <span id="cb25-7"><a href="#cb25-7" aria-hidden="true" tabindex="-1"></a>                 <span class="at">source =</span> source)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
 </div>
-<p>Then, we fit the model using the function <code>run_model()</code>, with the default “uninformative”/generalist prior on global proportions (<em>Dirichlet</em>(1, 1, 1)), which can be shortened as <code>alpha.prior = 1</code>. Given the hierarchical structure, and thus many parameters to estimate, the model requires a large number of iterations to converge. We set <code>run = &quot;long&quot;</code>, which fits 3 chains, each with 300,000 iterations, a of 200,000-iteration burn-in and a thinning of 100, thus retaining 3,000 posterior draws (i.e., 1,000 x 3 chains).</p>
+<p>Then, we fit the model using the function <code>run_model()</code>, with the default “uninformative”/generalist prior on global proportions (<em>Dirichlet</em>(1, 1, 1)), which can be shortened as <code>alpha.prior = 1</code>. Given the hierarchical structure, and thus many parameters to estimate, the model requires a large number of iterations to converge. We set <code>run = &quot;long&quot;</code>, which fits 3 chains, each with 300,000 iterations, a 200,000-iteration burn-in and a thinning of 100, thus retaining 3,000 posterior draws (i.e., 1,000 x 3 chains).</p>
 <div class="cell">
 <details open class="code-fold">
 <summary>Code</summary>
